@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+
+  "name": "Youtube Play Rate Extension",
+  "description": "Easily control YouTube's playback speed",
+  "version": "1.0",
+
+  "content_scripts": [
+    {
+      "matches"   : ["<all_urls>"],
+      "js"        : ["content.js"],
+      "run_at"    : "document_start",
+      "all_frames": true
+    }
+  ],
+
+  "permissions": [
+    "https://*/",
+    "http://*/"
+  ]
+}
