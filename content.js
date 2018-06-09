@@ -1,3 +1,13 @@
+// ==UserScript==
+// @name         Youtube Playback Rate
+// @namespace    http://cuoan.net/
+// @version      0.1
+// @description  Easily control YouTube's playback speed
+// @author       Xinkai Chen
+// @match        http://*/*
+// @match        https://*/*
+// @grant        none
+// ==/UserScript==
 
 (() => {
     'use strict';
@@ -55,7 +65,7 @@
         const bar = getToolButtonBar(container);
         const tooltip = getTooltipTextWrapper(container);
         const previewTooltip = tooltip.querySelector(".ytp-tooltip-text");
-        
+
         // detect when the original preview text is changed
         let frameId = 0;
 
@@ -105,7 +115,7 @@
             }
         };
 
-        buttonContainer.addEventListener("mousewheel", event => {
+        buttonContainer.addEventListener("wheel", event => {
             if (event.deltaY < 0) {
                 changeRate(event, 0.1);
             } else {
