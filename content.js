@@ -11,232 +11,298 @@
 
 (() => {
     'use strict';
-    function getSinglePlayer() {
-        return document.querySelector("video");
-    }
 
-    function getPlayerContainer(player) {
-        let container = player;
-        while(container !== null) {
-            if (container.matches(".html5-video-player")) {
-                return container;
-            }
-            container = container.parentNode;
-        }
-        return null;
-    }
-
-    function getToolButtonBar(container) {
-        return container.querySelector(".ytp-right-controls");
-    }
-
-    function getTooltipTextWrapper(container) {
-        return container.querySelector(".ytp-tooltip-text-wrapper");
-    }
-
-    function formatTime(total) {
-        const h = (total / 3600) | 0;
-        const m = (total / 60) % 60 | 0;
-        const s = (total % 60) | 0;
-        const m_str = (h > 0 && m < 10) ? `0${m}` : `${m}`;
-        const s_str = s < 10 ? `0${s}` : `${s}`;
-        return h !== 0 ? `${h}:${m_str}:${s_str}` : `${m_str}:${s_str}`;
-    }
-
-    function unformatTime(str) {
-        const splits = str.split(":");
-        const len = splits.length;
-        let accum = +splits[len - 1];
-        accum += (+splits[len-2]) * 60 || 0;
-        accum += (+splits[len-3]) * 60 || 0;
-        return accum;
-    }
-
-    function initializePlayer(player) {
-        const container = getPlayerContainer(player);
-        if (!container) {
-            return;
-        }
-        if (container.classList.contains("playrate-loaded")) {
-            return;
-        }
-        container.classList.add("playrate-loaded");
-
-        const bar = getToolButtonBar(container);
-        const tooltip = getTooltipTextWrapper(container);
-        const previewTooltip = tooltip.querySelector(".ytp-tooltip-text");
-
-        // detect when the original preview text is changed
-        let frameId = 0;
-
-        const oldRemoveChild = previewTooltip.removeChild.bind(previewTooltip);
-        previewTooltip.removeChild = what => {
-            if (frameId) {
-                cancelAnimationFrame(frameId);
-                frameId = 0;
-            }
-            frameId = requestAnimationFrame(() => {
-                const time = unformatTime(previewTooltip.innerHTML);
-                if (time) {
-                    updatePreviewText(formatTime(time / player.playbackRate));
-                } else {
-                    previewText.style.display = "none";
+    class Utils {
+        static getAncestorNode(node, selector) {
+            let currentNode = node;
+            while (currentNode !== null) {
+                if (currentNode.matches(selector)) {
+                    return currentNode;
                 }
-                frameId = 0;
+                currentNode = currentNode.parentNode;
+            }
+            return null;
+        }
+
+        static formatTime(seconds) {
+            const h = (seconds / 3600) | 0;
+            const m = (seconds / 60) % 60 | 0;
+            const s = (seconds % 60) | 0;
+            const m_str = (h > 0 && m < 10) ? `0${m}` : `${m}`;
+            const s_str = s < 10 ? `0${s}` : `${s}`;
+            return h !== 0 ? `${h}:${m_str}:${s_str}` : `${m_str}:${s_str}`;
+        }
+
+        static parseTime(str) {
+            const splits = str.split(":");
+            const len = splits.length;
+            let accum = +splits[len - 1];
+            accum += (+splits[len-2]) * 60 || 0;
+            accum += (+splits[len-3]) * 60 || 0;
+            return accum;
+        }
+
+        static log(...args) {
+            return console.log("PlayRate", ...args);
+        }
+    }
+
+    class Base {
+        constructor({ player, container }) {
+            this.player = player;
+            this.container = container;
+            this.rate = this.player.playbackRate;
+            this.warpedTimeIndicator = null;
+            this.statusOverlay = null;
+            this.overlayTimer = null;
+            this.toolbar = null;
+        }
+
+        initialize = () => {
+            if (this.player.getAttribute("playrate-loaded")) {
+                return;
+            }
+            this.player.setAttribute("playrate-loaded", true);
+
+            this.toolbar = this.getToolbar();
+            this.styleToolbar();
+
+            this.warpedTimeIndicator = this.createWarpedTimeIndicator();
+            this.styleWarpedTimeIndicator();
+            this.placeWarpedTimeIndicator(this.toolbar);
+
+            this.statusOverlay = this.createStatusOverlay();
+            this.placeStatusOverlay();
+
+            this.updateDuration();
+            this.player.addEventListener("durationchange", this.updateDuration);
+
+            this.setupUserInputListeners();
+
+        }
+
+        showStatusOverlay = () => {
+            if (this.overlayTimer) {
+                clearTimeout(this.overlayTimer);
+            }
+            this.statusOverlay.overlay.style.visibility = "visible";
+            this.overlayTimer = setTimeout(() => {
+                this.statusOverlay.overlay.style.visibility = "hidden";
+                this.overlayTimer = null;
+            }, 1500);
+        }
+
+        updateCurrent = () => {
+            this.warpedTimeIndicator.current.innerText = Utils.formatTime(this.player.currentTime / this.rate);
+        }
+
+        updateDuration = () => {
+            this.warpedTimeIndicator.duration.innerText = Utils.formatTime(this.player.duration / this.rate);
+        }
+
+        updateStatusOverlay = () => {
+            this.statusOverlay.status.innerText = `${this.player.playbackRate * 100 | 0}%`;
+        }
+
+        setupUserInputListeners = () => {
+            this.warpedTimeIndicator.root.addEventListener("wheel", event => {
+                if (event.deltaY < 0) {
+                    this.changeRate(event, 0.1);
+                } else {
+                    this.changeRate(event, -0.1);
+                }
             });
-            return oldRemoveChild(what);
-        };
 
-        const previewText = document.createElement("span");
-        previewText.classList.add("ytp-tooltip-text");
-        tooltip.appendChild(previewText);
+            document.addEventListener("keydown", event => {
+                if (event.target.tagName !== "INPUT" &&
+                    event.target.contentEditable === "inherit") {
+                    if (event.code === "NumpadAdd") {
+                        this.changeRate(event, 0.1);
+                    } else if (event.code === "NumpadSubtract") {
+                        this.changeRate(event, -0.1);
+                    }
+                }
+            });
 
-        const updatePreviewText = (v) => {
-            previewText.innerHTML = v;
-            previewText.style.display = "inline";
-        };
+            this.player.addEventListener("ratechange", this.onRateReset);
+            this.player.addEventListener("loadedmetadata", this.onRateReset);
+            this.player.addEventListener("timeupdate", this.updateCurrent);
+        }
 
-        let rate = 1;
-
-        let timer = 0;
-
-        const buttonContainer = document.createElement("div");
-        buttonContainer.classList.add("ytp-time-display");
-        buttonContainer.classList.add("playrate-ext");
-        buttonContainer.classList.add("notranslate");
-
-        const changeRate = (event, delta) => {
-            if ((delta > 0 && player.playbackRate < 4) ||
-                (delta < 0 && player.playbackRate > 0.2)) {
-                showStatus();
+        changeRate = (event, delta) => {
+            if ((delta > 0 && this.player.playbackRate < 4) ||
+                (delta < 0 && this.player.playbackRate > 0.2)) {
+                this.showStatusOverlay();
                 event.stopPropagation();
                 event.preventDefault();
-                player.playbackRate += delta;
+                this.player.playbackRate += delta;
             }
-        };
-
-        buttonContainer.addEventListener("wheel", event => {
-            if (event.deltaY < 0) {
-                changeRate(event, 0.1);
-            } else {
-                changeRate(event, -0.1);
-            }
-        });
-
-        document.addEventListener("keydown", event => {
-            if (event.target.tagName !== "INPUT" &&
-                event.target.contentEditable === "inherit") {
-                if (event.code === "NumpadAdd") {
-                    changeRate(event, 0.1);
-                } else if (event.code === "NumpadSubtract") {
-                    changeRate(event, -0.1);
-                }
-            }
-        });
-
-        const showStatus = () => {
-            if (timer) {
-                clearTimeout(timer);
-            }
-            statusContainer.style.visibility = "visible";
-            timer = setTimeout(() => {
-                statusContainer.style.visibility = "hidden";
-                timer = 0;
-            }, 1500);
-        };
-
-        const current = document.createElement("span");
-        current.classList.add("ytp-time-current");
-        buttonContainer.appendChild(current);
-
-        const separator = document.createElement("span");
-        separator.classList.add("ytp-time-separator");
-        separator.innerHTML = " / ";
-        buttonContainer.appendChild(separator);
-
-        const duration = document.createElement("span");
-        duration.classList.add("ytp-time-duration");
-        buttonContainer.appendChild(duration);
-
-        bar.insertBefore(buttonContainer, bar.firstChild);
-
-        const status = document.createElement("div");
-        status.style.textAlign = "center";
-        status.style.margin = "auto";
-        status.style.fontSize = "11em";
-        status.style.color = "rgba(255,255,255, 0.5)";
-
-        const statusContainer = document.createElement("div");
-        statusContainer.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-        statusContainer.style.zIndex = 10;
-        statusContainer.style.width = "50%";
-        statusContainer.style.height = "50%";
-        statusContainer.style.position = "absolute";
-        statusContainer.style.display = "flex";
-        statusContainer.style.visibility = "hidden";
-        statusContainer.style.top = "25%";
-        statusContainer.style.left = "25%";
-        statusContainer.style.pointerEvents = "none";
-        statusContainer.style.transition = "all 0.5s linear";
-
-        statusContainer.appendChild(status);
-        container.appendChild(statusContainer);
-
-        {
-            // fix style: floating .ytp-right-controls may overflow
-            bar.parentNode.style.position = "relative";
-            bar.style.position = "absolute";
-            bar.style.right = "0";
-            bar.style.top = "0";
-            bar.style.float = "none";
         }
 
-        const updateCurrent = () => {
-            current.innerHTML = formatTime(player.currentTime / rate);
-        };
-        updateCurrent();
-
-        const updateDuration = () => {
-            duration.innerHTML = formatTime(player.duration / rate);
-        };
-        updateDuration();
-        player.addEventListener("durationchange", updateDuration);
-
-        const updateStatus = () => {
-            status.innerHTML = `${player.playbackRate * 100 | 0}%`;
-        };
-
-        const onRateReset = () => {
-            rate = player.playbackRate;
-            updateStatus();
-            updateCurrent();
-            updateDuration();
-        };
-
-        player.addEventListener("ratechange", onRateReset);
-        player.addEventListener("loadedmetadata", onRateReset);
-        player.addEventListener("timeupdate", updateCurrent);
-    }
-
-    function onload() {
-        document.removeEventListener("DOMContentLoaded", onload);
-        if (document.domain === "www.youtube.com") {
-            const player = getSinglePlayer();
+        static getPlayer = async() => {
+            const player = document.querySelector("video,audio");
             if (player) {
-                console.log("Init...");
-                initializePlayer(player);
-            } else {
+                return player;
+            }
+
+            return new Promise(resolve => {
                 const onMetaDataloaded = event => {
                     const tagName = event.target.tagName;
                     if (tagName === "VIDEO" || tagName === "AUDIO") {
                         document.removeEventListener("loadedmetadata", onMetaDataloaded, true);
-                        console.log("Late Init...");
-                        initializePlayer(event.target);
+                        resolve(event.target);
                     }
                 };
                 document.body.addEventListener("loadedmetadata", onMetaDataloaded, true);
+            });
+        }
+
+        static launch = async() => {
+            const player = await this.getPlayer();
+
+            const siteDetectors = {
+                ".html5-video-player": Youtube,
+                "div.bilibili-player-video-wrap": Bilibili,
+            };
+
+            for (const [containerSelector, Provider] of Object.entries(siteDetectors)) {
+                const container = Utils.getAncestorNode(player, containerSelector);
+                if (container) {
+                    Utils.log("Matched Provider", Provider);
+                    new Provider({ player, container });
+                    break;
+                }
             }
         }
+
+        createWarpedTimeIndicator = () => {
+            const root = document.createElement("div");
+
+            const current = document.createElement("span");
+            root.appendChild(current);
+
+            const separator = document.createElement("span");
+            separator.innerText = " / ";
+            root.appendChild(separator);
+
+            const duration = document.createElement("span");
+            root.appendChild(duration);
+
+            return {
+                root,
+                current,
+                separator,
+                duration,
+            };
+        }
+
+        createStatusOverlay = () => {
+            const status = document.createElement("div");
+            status.style.textAlign = "center";
+            status.style.margin = "auto";
+            status.style.fontSize = "11em";
+            status.style.color = "rgba(255,255,255, 0.5)";
+
+            const overlay = document.createElement("div");
+            overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+            overlay.style.zIndex = 10;
+            overlay.style.width = "50%";
+            overlay.style.height = "50%";
+            overlay.style.position = "absolute";
+            overlay.style.display = "flex";
+            overlay.style.visibility = "hidden";
+            overlay.style.top = "25%";
+            overlay.style.left = "25%";
+            overlay.style.pointerEvents = "none";
+            overlay.style.transition = "all 0.5s linear";
+
+            overlay.appendChild(status);
+
+            return {
+                status,
+                overlay,
+            };
+        }
+
+        getToolbar = () => {
+            throw new Error("Abstract");
+        }
+
+        styleToolbar = () => {
+            throw new Error("Abstract");
+        }
+
+        styleWarpedTimeIndicator = () => {
+            throw new Error("Abstract");
+        }
+
+        placeWarpedTimeIndicator = (toolbar) => {
+            throw new Error("Abstract");
+        }
+
+        placeStatusOverlay = () => {
+            throw new Error("Abstract");
+        }
+
+        onRateReset = () => {
+            this.rate = this.player.playbackRate;
+            this.updateStatusOverlay();
+            this.updateCurrent();
+            this.updateDuration();
+        }
+    }
+
+    class Youtube extends Base {
+        constructor({ player, container }) {
+            super({ player, container });
+            this.initialize();
+        }
+
+        getToolbar = () => {
+            return this.container.querySelector(".ytp-right-controls");
+        }
+
+        styleToolbar = () => {
+            // fix style: floating .ytp-right-controls may overflow
+            this.toolbar.parentNode.style.position = "relative";
+            this.toolbar.style.position = "absolute";
+            this.toolbar.style.right = "0";
+            this.toolbar.style.top = "0";
+            this.toolbar.style.float = "none";
+        }
+
+        styleWarpedTimeIndicator = () => {
+            const {
+                root,
+                current,
+                separator,
+                duration,
+            } = this.warpedTimeIndicator;
+            root.classList.add("ytp-time-display", "playrate-ext", "notranslate");
+            current.classList.add("ytp-time-current");
+            separator.classList.add("ytp-time-separator");
+            duration.classList.add("ytp-time-duration");
+        }
+
+        placeWarpedTimeIndicator = (toolbar) => {
+            toolbar.insertBefore(this.warpedTimeIndicator.root, toolbar.firstChild);
+        }
+
+        placeStatusOverlay = () => {
+            this.container.appendChild(this.statusOverlay.overlay);
+        }
+    }
+
+    class Bilibili extends Base {
+        constructor({ player, container }) {
+            super({ player, container });
+        }
+    }
+
+    function onload() {
+        Utils.log("OnLoad");
+        document.removeEventListener("DOMContentLoaded", onload);
+        Base.launch();
     }
 
     document.addEventListener("DOMContentLoaded", onload);
