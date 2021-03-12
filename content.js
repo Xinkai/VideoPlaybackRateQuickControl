@@ -15,7 +15,7 @@
     class Utils {
         static getAncestorNode(node, selector) {
             let currentNode = node;
-            while (currentNode !== null) {
+            while (currentNode !== document) {
                 if (currentNode.matches(selector)) {
                     return currentNode;
                 }
@@ -162,13 +162,12 @@
 
             const siteDetectors = {
                 ".html5-video-player": Youtube,
-                "div.bilibili-player-video-wrap": Bilibili,
+                ".bilibili-player-video-wrap": Bilibili,
             };
 
             for (const [containerSelector, Provider] of Object.entries(siteDetectors)) {
                 const container = Utils.getAncestorNode(player, containerSelector);
                 if (container) {
-                    Utils.log("Matched Provider", Provider);
                     new Provider({ player, container });
                     break;
                 }
@@ -296,11 +295,51 @@
     class Bilibili extends Base {
         constructor({ player, container }) {
             super({ player, container });
+            this.initialize();
+        }
+
+        getToolbar = () => {
+            return this.container.querySelector(".bilibili-player-video-control");
+        }
+
+        styleToolbar = () => {
+
+        }
+
+        styleWarpedTimeIndicator = () => {
+            const {
+                root,
+                current,
+                separator,
+                duration,
+            } = this.warpedTimeIndicator;
+            root.classList.add("bilibili-player-video-time");
+            root.style.color = "white";
+            root.style.width = "60px";
+            current.classList.add("bilibili-player-video-time-now");
+            separator.classList.add("bilibili-player-video-divider");
+            duration.classList.add("bilibili-player-video-time-total");
+        }
+
+        placeWarpedTimeIndicator = (toolbar) => {
+            const bottom = this.toolbar.querySelector(".bilibili-player-video-control-bottom-right");
+            const intervalTimer = setInterval(() => {
+                const originSpeed = bottom.querySelector(".bilibili-player-video-btn-speed");
+                if (!originSpeed) {
+                    return;
+                }
+                 bottom.insertBefore(this.warpedTimeIndicator.root, originSpeed);
+                originSpeed.style.display = "none";
+                clearInterval(intervalTimer);
+            }, 100);
+        }
+
+        placeStatusOverlay = () => {
+            this.container.appendChild(this.statusOverlay.overlay);
         }
     }
 
     function onload() {
-        Utils.log("OnLoad");
         document.removeEventListener("DOMContentLoaded", onload);
         Base.launch();
     }

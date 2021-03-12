@@ -6,4 +6,8 @@
 *.iml
 out
 gen
+
 # Created by .ignore support plugin (hsz.mobi)
+
+/web-ext-artifacts
+*.log

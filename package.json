@@ -1,0 +1,17 @@
+{
+  "name": "youtube_playrate",
+  "version": "1.0.0",
+  "description": "A convenient way to control playback speed on the Web",
+  "main": "index.js",
+  "repository": "https://github.com/Xinkai/YoutubePlayrate",
+  "author": "Xinkai Chen <xinkai.chen@qq.com>",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "build": "yarn run web-ext build --overwrite-dest"
+  },
+  "devDependencies": {
+    "eslint": "7.21.0",
+    "web-ext": "6.0.0"
+  }
+}
