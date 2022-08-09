@@ -1,9 +1,9 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
 
-  "name": "Youtube Play Rate Extension",
-  "description": "Easily control YouTube's playback speed",
-  "version": "1.0",
+  "name": "Youtube Playback Rate Quick Control",
+  "description": "Easily control video playback speed",
+  "version": "1.9",
 
   "content_scripts": [
     {
@@ -14,8 +14,9 @@
     }
   ],
 
-  "permissions": [
-    "https://*/",
-    "http://*/"
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.bilibili.com/*",
+    "*://*.odysee.com/*"
   ]
 }

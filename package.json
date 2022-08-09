@@ -1,17 +1,19 @@
 {
-  "name": "youtube_playrate",
-  "version": "1.0.0",
-  "description": "A convenient way to control playback speed on the Web",
-  "main": "index.js",
+  "name": "video_playrate_quick_control",
+  "version": "1.9",
+  "description": "Easily control video playback speed",
   "repository": "https://github.com/Xinkai/YoutubePlayrate",
   "author": "Xinkai Chen <xinkai.chen@qq.com>",
   "license": "MIT",
   "private": false,
   "scripts": {
-    "build": "yarn run web-ext build --overwrite-dest"
+    "build": "yarn run web-ext build --overwrite-dest",
+    "lint": "yarn run eslint content.js"
   },
   "devDependencies": {
-    "eslint": "7.21.0",
-    "web-ext": "6.0.0"
+    "eslint": "8.2.0",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-plugin-import": "^2.25.2",
+    "web-ext": "7.1.1"
   }
 }

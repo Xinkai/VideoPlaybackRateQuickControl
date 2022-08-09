@@ -1,17 +1,21 @@
 // ==UserScript==
-// @name         Youtube Playback Rate
-// @namespace    http://cuoan.net/
-// @version      0.1
-// @description  Easily control YouTube's playback speed
-// @author       Xinkai Chen
-// @match        http://*/*
-// @match        https://*/*
+// @name         Video Playback Rate Quick Control
+// @namespace    https://github.com/Xinkai
+// @version      1.9
+// @description  Easily control video playback speed
+// @author       Xinkai Chen <xinkai.chen@qq.com>
+// @match        *://*.youtube.com/*
+// @match        *://*.bilibili.com/*
+// @match        *://*.odysee.com/*
+// @supportURL   https://github.com/Xinkai/VideoPlaybackRateQuickControl
+// @license      MIT
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
-(() => {
-    'use strict';
+/* eslint-disable max-classes-per-file */
 
+(() => {
     class Utils {
         static getAncestorNode(node, selector) {
             let currentNode = node;
@@ -25,323 +29,390 @@
         }
 
         static formatTime(seconds) {
-            const h = (seconds / 3600) | 0;
-            const m = (seconds / 60) % 60 | 0;
-            const s = (seconds % 60) | 0;
-            const m_str = (h > 0 && m < 10) ? `0${m}` : `${m}`;
-            const s_str = s < 10 ? `0${s}` : `${s}`;
-            return h !== 0 ? `${h}:${m_str}:${s_str}` : `${m_str}:${s_str}`;
+            const h = (seconds / 3600) | 0; // eslint-disable-line no-bitwise
+            const m = (seconds / 60) % 60 | 0; // eslint-disable-line no-bitwise
+            const s = (seconds % 60) | 0; // eslint-disable-line no-bitwise
+            const mStr = (h > 0 && m < 10) ? `0${m}` : `${m}`;
+            const sStr = s < 10 ? `0${s}` : `${s}`;
+            return h !== 0 ? `${h}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
         }
 
         static parseTime(str) {
             const splits = str.split(":");
             const len = splits.length;
             let accum = +splits[len - 1];
-            accum += (+splits[len-2]) * 60 || 0;
-            accum += (+splits[len-3]) * 60 || 0;
+            accum += (+splits[len - 2]) * 60 || 0;
+            accum += (+splits[len - 3]) * 60 || 0;
             return accum;
         }
 
         static log(...args) {
+            /* eslint-disable-next-line no-console */
             return console.log("PlayRate", ...args);
         }
+
+        static error(...args) {
+            /* eslint-disable-next-line no-console */
+            return console.error("PlayRate", ...args);
+        }
+
+        static awaitForMedia = (callback) => {
+            const onMetaDataLoaded = (event) => {
+                const { tagName } = event.target;
+                if (tagName === "VIDEO" || tagName === "AUDIO") {
+                    callback(event.target);
+                }
+            };
+            document.body.addEventListener("loadedmetadata", onMetaDataLoaded, true);
+            return () => {
+                document.body.removeEventListener("loadedmetadata", onMetaDataLoaded, true);
+            };
+        };
+
+        static awaitForDescendant = async (node, selector) => {
+            const attempt = node.querySelector(selector);
+            if (attempt != null) {
+                return attempt;
+            }
+            return new Promise((resolve) => {
+                const observer = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        if (mutation.type !== "childList") {
+                            continue;
+                        }
+                        for (const addedNode of mutation.addedNodes) {
+                            if ((addedNode instanceof HTMLElement) && addedNode.matches(selector)) {
+                                observer.disconnect();
+                                resolve(addedNode);
+                            }
+                        }
+                    }
+                });
+                observer.observe(node, { subtree: true, childList: true });
+            });
+        };
+
+        static domainMatches(host) {
+            return window.location.host === host || window.location.host.endsWith(`.${host}`);
+        }
     }
 
-    class Base {
-        constructor({ player, container }) {
-            this.player = player;
-            this.container = container;
-            this.rate = this.player.playbackRate;
-            this.warpedTimeIndicator = null;
-            this.statusOverlay = null;
-            this.overlayTimer = null;
-            this.toolbar = null;
+    class SiteImpl {
+        constructor($container) {
+            this.$container = $container;
         }
 
-        initialize = () => {
-            if (this.player.getAttribute("playrate-loaded")) {
-                return;
+        /**
+         * @abstract
+         */
+        // eslint-disable-next-line class-methods-use-this
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {
+
+        };
+
+        /**
+         * @abstract
+         */
+        // eslint-disable-next-line class-methods-use-this
+        placeStatusOverlay = ({ $overlay }) => { // eslint-disable-line no-unused-vars
+
+        };
+    }
+
+    class YoutubeImpl extends SiteImpl {
+        constructor($container) {
+            super($container);
+            this.$container = $container;
+        }
+
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped,
+        }) => {
+            const $toolbar = this.$container.querySelector(".ytp-right-controls");
+
+            // fix style: floating .ytp-right-controls may overflow
+            $toolbar.parentNode.style.position = "relative";
+            Object.assign($toolbar.style, {
+                position: "absolute",
+                right: 0,
+                top: 0,
+                float: "none",
+            });
+
+            $warpedTimeIndicator.classList.add("ytp-time-display", "playrate-ext", "notranslate");
+            $currentWarped.classList.add("ytp-time-current");
+            $separator.classList.add("ytp-time-separator");
+            $durationWarped.classList.add("ytp-time-duration");
+
+            $toolbar.insertBefore($warpedTimeIndicator, $toolbar.firstChild);
+        };
+
+        placeStatusOverlay = ({ $overlay }) => {
+            this.$container.appendChild($overlay);
+        };
+    }
+
+    class BilibiliImpl extends SiteImpl {
+        constructor($container) {
+            super($container);
+            this.$container = $container;
+        }
+
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {
+            const $originalPlayBackRate = await Utils.awaitForDescendant(
+                this.$container,
+                ".bpx-player-ctrl-playbackrate",
+            );
+
+            $warpedTimeIndicator.classList.add("bpx-player-ctrl-btn");
+            Object.assign($warpedTimeIndicator.style, {
+                width: "auto",
+                fontSize: "14px",
+                fontWeight: 600,
+            });
+
+            $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
+        };
+
+        placeStatusOverlay = ({ $overlay }) => {
+            this.$container.appendChild($overlay);
+        };
+    }
+
+    class OdyseeImpl extends SiteImpl {
+        constructor($container) {
+            super($container);
+            this.$container = $container;
+        }
+
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {
+            const $originalPlayBackRate = await Utils.awaitForDescendant(this.$container, ".vjs-playback-rate");
+
+            $warpedTimeIndicator.classList.add("vjs-menu-button", "vjs-playback-rate", "vjs-control");
+            Object.assign($warpedTimeIndicator.style, {
+                width: "auto",
+            });
+
+            $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
+        };
+
+        placeStatusOverlay = ({ $overlay }) => {
+            this.$container.appendChild($overlay);
+        };
+    }
+
+    class PlayRate {
+        constructor({ impl, $media }) {
+            this.impl = impl;
+            this.$media = $media;
+            this.unloads = [];
+
+            {
+                // Set up warped time indicator
+                this.$warpedTimeIndicator = document.createElement("div");
+
+                this.$currentWarped = document.createElement("span");
+                this.$warpedTimeIndicator.appendChild(this.$currentWarped);
+
+                const $separator = document.createElement("span");
+                $separator.innerText = " / ";
+                this.$warpedTimeIndicator.appendChild($separator);
+
+                this.$durationWarped = document.createElement("span");
+                this.$warpedTimeIndicator.appendChild(this.$durationWarped);
+                this.impl.placeWarpedTimeIndicator({
+                    $warpedTimeIndicator: this.$warpedTimeIndicator,
+                    $currentWarped: this.$currentWarped,
+                    $separator,
+                    $durationWarped: this.$durationWarped,
+                });
             }
-            this.player.setAttribute("playrate-loaded", true);
 
-            this.toolbar = this.getToolbar();
-            this.styleToolbar();
+            {
+                // Set up status overlay
+                this.$overlayText = document.createElement("div");
+                Object.assign(this.$overlayText.style, {
+                    textAlign: "center",
+                    margin: "auto",
+                    fontSize: "11em",
+                    color: "rgba(255,255,255, 0.5)",
+                });
 
-            this.warpedTimeIndicator = this.createWarpedTimeIndicator();
-            this.styleWarpedTimeIndicator();
-            this.placeWarpedTimeIndicator(this.toolbar);
+                this.$overlay = document.createElement("div");
+                Object.assign(this.$overlay.style, {
+                    backgroundColor: "rgba(0, 0, 0, 0.5)",
+                    zIndex: 10,
+                    width: "50%",
+                    height: "50%",
+                    position: "absolute",
+                    display: "flex",
+                    visibility: "hidden",
+                    top: "25%",
+                    left: "25%",
+                    pointerEvents: "none",
+                    transition: "all 0.5s linear",
+                });
 
-            this.statusOverlay = this.createStatusOverlay();
-            this.placeStatusOverlay();
+                this.$overlay.appendChild(this.$overlayText);
+                this.impl.placeStatusOverlay({ $overlay: this.$overlay });
+            }
+
+            this.overlayTimer = null;
 
             this.updateDuration();
-            this.player.addEventListener("durationchange", this.updateDuration);
-
             this.setupUserInputListeners();
-
         }
 
-        showStatusOverlay = () => {
+        addNodeEventListener = (node, eventName, handler) => {
+            node.addEventListener(eventName, handler);
+            this.unloads.push(() => node.removeEventListener(eventName, handler));
+        };
+
+        unload = () => {
+            this.clearShowStatusOverlay();
+            this.unloads.forEach((fn) => fn());
+            if (this.$overlay) {
+                this.$overlay.remove();
+                this.$overlay = null;
+            }
+            if (this.$warpedTimeIndicator) {
+                this.$warpedTimeIndicator.remove();
+                this.$warpedTimeIndicator = null;
+            }
+        };
+
+        clearShowStatusOverlay = () => {
             if (this.overlayTimer) {
                 clearTimeout(this.overlayTimer);
+                this.overlayTimer = null;
             }
-            this.statusOverlay.overlay.style.visibility = "visible";
+        };
+
+        showStatusOverlay = () => {
+            this.clearShowStatusOverlay();
+
+            this.$overlay.style.visibility = "visible";
             this.overlayTimer = setTimeout(() => {
-                this.statusOverlay.overlay.style.visibility = "hidden";
+                this.$overlay.style.visibility = "hidden";
                 this.overlayTimer = null;
             }, 1500);
-        }
+        };
 
         updateCurrent = () => {
-            this.warpedTimeIndicator.current.innerText = Utils.formatTime(this.player.currentTime / this.rate);
-        }
+            this.$currentWarped.innerText = Utils.formatTime(this.$media.currentTime / this.rate);
+        };
 
         updateDuration = () => {
-            this.warpedTimeIndicator.duration.innerText = Utils.formatTime(this.player.duration / this.rate);
-        }
+            this.$durationWarped.innerText = Utils.formatTime(this.$media.duration / this.rate);
+        };
 
-        updateStatusOverlay = () => {
-            this.statusOverlay.status.innerText = `${this.player.playbackRate * 100 | 0}%`;
-        }
+        updateOverlayText = () => {
+            this.$overlayText.innerText = `${Math.round(this.$media.playbackRate * 100)}%`;
+        };
 
-        setupUserInputListeners = () => {
-            this.warpedTimeIndicator.root.addEventListener("wheel", event => {
-                if (event.deltaY < 0) {
-                    this.changeRate(event, 0.1);
-                } else {
-                    this.changeRate(event, -0.1);
-                }
-            });
-
-            document.addEventListener("keydown", event => {
-                if (event.target.tagName !== "INPUT" &&
-                    event.target.contentEditable === "inherit") {
-                    if (event.code === "NumpadAdd") {
-                        this.changeRate(event, 0.1);
-                    } else if (event.code === "NumpadSubtract") {
-                        this.changeRate(event, -0.1);
-                    }
-                }
-            });
-
-            this.player.addEventListener("ratechange", this.onRateReset);
-            this.player.addEventListener("loadedmetadata", this.onRateReset);
-            this.player.addEventListener("timeupdate", this.updateCurrent);
-        }
-
-        changeRate = (event, delta) => {
-            if ((delta > 0 && this.player.playbackRate < 4) ||
-                (delta < 0 && this.player.playbackRate > 0.2)) {
-                this.showStatusOverlay();
+        rateStepChange = (event) => {
+            if (this.changeRate(event.deltaY < 0 ? 0.1 : -0.1)) {
                 event.stopPropagation();
                 event.preventDefault();
-                this.player.playbackRate += delta;
             }
-        }
+        };
 
-        static getPlayer = async() => {
-            const player = document.querySelector("video,audio");
-            if (player) {
-                return player;
-            }
+        setupUserInputListeners = () => {
+            this.addNodeEventListener(this.$warpedTimeIndicator, "wheel", this.rateStepChange);
 
-            return new Promise(resolve => {
-                const onMetaDataloaded = event => {
-                    const tagName = event.target.tagName;
-                    if (tagName === "VIDEO" || tagName === "AUDIO") {
-                        document.removeEventListener("loadedmetadata", onMetaDataloaded, true);
-                        resolve(event.target);
+            this.addNodeEventListener(document, "keydown", (event) => {
+                if (event.target.tagName !== "INPUT"
+                    && event.target.contentEditable === "inherit") {
+                    const step = {
+                        NumpadAdd: 0.1,
+                        NumpadSubtract: -0.1,
+                    }[event.code];
+                    if (step && this.changeRate(step)) {
+                        event.stopPropagation();
+                        event.preventDefault();
                     }
-                };
-                document.body.addEventListener("loadedmetadata", onMetaDataloaded, true);
-            });
-        }
-
-        static launch = async() => {
-            const player = await this.getPlayer();
-
-            const siteDetectors = {
-                ".html5-video-player": Youtube,
-                ".bilibili-player-video-wrap": Bilibili,
-            };
-
-            for (const [containerSelector, Provider] of Object.entries(siteDetectors)) {
-                const container = Utils.getAncestorNode(player, containerSelector);
-                if (container) {
-                    new Provider({ player, container });
-                    break;
                 }
+            });
+
+            this.addNodeEventListener(this.$media, "durationchange", this.updateDuration);
+            this.addNodeEventListener(this.$media, "ratechange", this.onRateReset);
+            this.addNodeEventListener(this.$media, "loadedmetadata", this.onRateReset);
+            this.addNodeEventListener(this.$media, "timeupdate", this.updateCurrent);
+        };
+
+        changeRate = (step) => {
+            const { playbackRate } = this.$media;
+            if ((step > 0 && playbackRate < 4)
+                || (step < 0 && playbackRate > 0.2)) {
+                const newRate = playbackRate + step;
+                this.$media.playbackRate = Math.round(newRate * 100) / 100;
+                return true;
             }
-        }
-
-        createWarpedTimeIndicator = () => {
-            const root = document.createElement("div");
-
-            const current = document.createElement("span");
-            root.appendChild(current);
-
-            const separator = document.createElement("span");
-            separator.innerText = " / ";
-            root.appendChild(separator);
-
-            const duration = document.createElement("span");
-            root.appendChild(duration);
-
-            return {
-                root,
-                current,
-                separator,
-                duration,
-            };
-        }
-
-        createStatusOverlay = () => {
-            const status = document.createElement("div");
-            status.style.textAlign = "center";
-            status.style.margin = "auto";
-            status.style.fontSize = "11em";
-            status.style.color = "rgba(255,255,255, 0.5)";
-
-            const overlay = document.createElement("div");
-            overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-            overlay.style.zIndex = 10;
-            overlay.style.width = "50%";
-            overlay.style.height = "50%";
-            overlay.style.position = "absolute";
-            overlay.style.display = "flex";
-            overlay.style.visibility = "hidden";
-            overlay.style.top = "25%";
-            overlay.style.left = "25%";
-            overlay.style.pointerEvents = "none";
-            overlay.style.transition = "all 0.5s linear";
-
-            overlay.appendChild(status);
-
-            return {
-                status,
-                overlay,
-            };
-        }
-
-        getToolbar = () => {
-            throw new Error("Abstract");
-        }
-
-        styleToolbar = () => {
-            throw new Error("Abstract");
-        }
-
-        styleWarpedTimeIndicator = () => {
-            throw new Error("Abstract");
-        }
-
-        placeWarpedTimeIndicator = (toolbar) => {
-            throw new Error("Abstract");
-        }
-
-        placeStatusOverlay = () => {
-            throw new Error("Abstract");
-        }
+            return false;
+        };
 
         onRateReset = () => {
-            this.rate = this.player.playbackRate;
-            this.updateStatusOverlay();
+            this.rate = this.$media.playbackRate;
+            this.showStatusOverlay();
+            this.updateOverlayText();
             this.updateCurrent();
             this.updateDuration();
-        }
+        };
     }
 
-    class Youtube extends Base {
-        constructor({ player, container }) {
-            super({ player, container });
-            this.initialize();
-        }
-
-        getToolbar = () => {
-            return this.container.querySelector(".ytp-right-controls");
-        }
-
-        styleToolbar = () => {
-            // fix style: floating .ytp-right-controls may overflow
-            this.toolbar.parentNode.style.position = "relative";
-            this.toolbar.style.position = "absolute";
-            this.toolbar.style.right = "0";
-            this.toolbar.style.top = "0";
-            this.toolbar.style.float = "none";
-        }
-
-        styleWarpedTimeIndicator = () => {
-            const {
-                root,
-                current,
-                separator,
-                duration,
-            } = this.warpedTimeIndicator;
-            root.classList.add("ytp-time-display", "playrate-ext", "notranslate");
-            current.classList.add("ytp-time-current");
-            separator.classList.add("ytp-time-separator");
-            duration.classList.add("ytp-time-duration");
-        }
-
-        placeWarpedTimeIndicator = (toolbar) => {
-            toolbar.insertBefore(this.warpedTimeIndicator.root, toolbar.firstChild);
-        }
-
-        placeStatusOverlay = () => {
-            this.container.appendChild(this.statusOverlay.overlay);
-        }
-    }
-
-    class Bilibili extends Base {
-        constructor({ player, container }) {
-            super({ player, container });
-            this.initialize();
-        }
-
-        getToolbar = () => {
-            return this.container.querySelector(".bilibili-player-video-control");
-        }
-
-        styleToolbar = () => {
-
-        }
-
-        styleWarpedTimeIndicator = () => {
-            const {
-                root,
-                current,
-                separator,
-                duration,
-            } = this.warpedTimeIndicator;
-            root.classList.add("bilibili-player-video-time");
-            root.style.color = "white";
-            root.style.width = "60px";
-            current.classList.add("bilibili-player-video-time-now");
-            separator.classList.add("bilibili-player-video-divider");
-            duration.classList.add("bilibili-player-video-time-total");
-        }
-
-        placeWarpedTimeIndicator = (toolbar) => {
-            const bottom = this.toolbar.querySelector(".bilibili-player-video-control-bottom-right");
-            const intervalTimer = setInterval(() => {
-                const originSpeed = bottom.querySelector(".bilibili-player-video-btn-speed");
-                if (!originSpeed) {
+    function main() {
+        let instance = null;
+        if (Utils.domainMatches("youtube.com")) {
+            Utils.awaitForMedia(($media) => {
+                const $container = Utils.getAncestorNode($media, ".html5-video-player");
+                if (!$container) {
+                    Utils.log("Video not loaded in a container");
                     return;
                 }
-                 bottom.insertBefore(this.warpedTimeIndicator.root, originSpeed);
-                originSpeed.style.display = "none";
-                clearInterval(intervalTimer);
-            }, 100);
-        }
-
-        placeStatusOverlay = () => {
-            this.container.appendChild(this.statusOverlay.overlay);
+                const impl = new YoutubeImpl($container);
+                if (instance) {
+                    instance.unload();
+                }
+                instance = new PlayRate({ impl, $media });
+            });
+        } else if (Utils.domainMatches("bilibili.com")) {
+            Utils.awaitForMedia(($media) => {
+                const $container = Utils.getAncestorNode($media, "#bilibili-player .bpx-player-container");
+                if (!$container) {
+                    Utils.log("Video not loaded in a container");
+                    return;
+                }
+                const impl = new BilibiliImpl($container);
+                if (instance) {
+                    instance.unload();
+                }
+                instance = new PlayRate({ impl, $media });
+            });
+        } else if (Utils.domainMatches("odysee.com")) {
+            Utils.awaitForMedia(($media) => {
+                const $container = Utils.getAncestorNode($media, ".video-js");
+                if (!$container) {
+                    Utils.log("Video not loaded in a container");
+                    return;
+                }
+                const impl = new OdyseeImpl($container);
+                if (instance) {
+                    instance.unload();
+                }
+                instance = new PlayRate({ impl, $media });
+            });
         }
     }
 
     function onload() {
+        main();
         document.removeEventListener("DOMContentLoaded", onload);
-        Base.launch();
     }
 
     document.addEventListener("DOMContentLoaded", onload);
