@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9
+// @version      1.9.1
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
@@ -69,10 +69,12 @@
             };
         };
 
-        static awaitForDescendant = async (node, selector) => {
-            const attempt = node.querySelector(selector);
-            if (attempt != null) {
-                return attempt;
+        static awaitForDescendant = async (node, selectors) => {
+            for (const selector of selectors) {
+                const attempt = node.querySelector(selector);
+                if (attempt != null) {
+                    return attempt;
+                }
             }
             return new Promise((resolve) => {
                 const observer = new MutationObserver((mutations) => {
@@ -81,9 +83,11 @@
                             continue;
                         }
                         for (const addedNode of mutation.addedNodes) {
-                            if ((addedNode instanceof HTMLElement) && addedNode.matches(selector)) {
-                                observer.disconnect();
-                                resolve(addedNode);
+                            if (addedNode instanceof HTMLElement) {
+                                if (selectors.some((selector) => addedNode.matches(selector))) {
+                                    observer.disconnect();
+                                    resolve(addedNode);
+                                }
                             }
                         }
                     }
@@ -165,15 +169,26 @@
         }) => {
             const $originalPlayBackRate = await Utils.awaitForDescendant(
                 this.$container,
-                ".bpx-player-ctrl-playbackrate",
+                [
+                    ".bpx-player-ctrl-playbackrate",
+                    ".squirtle-speed-wrap",
+                ],
             );
-
-            $warpedTimeIndicator.classList.add("bpx-player-ctrl-btn");
-            Object.assign($warpedTimeIndicator.style, {
-                width: "auto",
-                fontSize: "14px",
-                fontWeight: 600,
-            });
+            if ($originalPlayBackRate.matches(".bpx-player-ctrl-playbackrate")) {
+                $warpedTimeIndicator.classList.add("bpx-player-ctrl-btn");
+                Object.assign($warpedTimeIndicator.style, {
+                    width: "auto",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                });
+            } else {
+                $warpedTimeIndicator.classList.add("squirtle-block-wrap");
+                Object.assign($warpedTimeIndicator.style, {
+                    height: "auto",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                });
+            }
 
             $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
         };
@@ -192,7 +207,7 @@
         placeWarpedTimeIndicator = async ({
             $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
         }) => {
-            const $originalPlayBackRate = await Utils.awaitForDescendant(this.$container, ".vjs-playback-rate");
+            const $originalPlayBackRate = await Utils.awaitForDescendant(this.$container, [".vjs-playback-rate"]);
 
             $warpedTimeIndicator.classList.add("vjs-menu-button", "vjs-playback-rate", "vjs-control");
             Object.assign($warpedTimeIndicator.style, {
