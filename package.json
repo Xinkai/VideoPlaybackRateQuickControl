@@ -7,7 +7,6 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "build": "yarn run web-ext build --overwrite-dest",
     "lint": "yarn run eslint content.js"
   },
   "devDependencies": {
