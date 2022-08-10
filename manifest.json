@@ -3,7 +3,7 @@
 
   "name": "Youtube Playback Rate Quick Control",
   "description": "Easily control video playback speed",
-  "version": "1.9.1",
+  "version": "1.9.2",
 
   "content_scripts": [
     {
@@ -17,6 +17,7 @@
   "host_permissions": [
     "*://*.youtube.com/*",
     "*://*.bilibili.com/*",
-    "*://*.odysee.com/*"
+    "*://*.odysee.com/*",
+    "*://*.reddit.com/*"
   ]
 }

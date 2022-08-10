@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9.1
+// @version      1.9.2
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
 // @match        *://*.bilibili.com/*
 // @match        *://*.odysee.com/*
+// @match        *://*.reddit.com/*
 // @supportURL   https://github.com/Xinkai/VideoPlaybackRateQuickControl
 // @license      MIT
 // @run-at       document-start
@@ -222,6 +223,28 @@
         };
     }
 
+    class RedditImpl extends SiteImpl {
+        constructor($container) {
+            super($container);
+            this.$container = $container;
+        }
+
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {
+            const $originalSettingBtn = (await Utils.awaitForDescendant(this.$container, ["[aria-label='Settings']"]))
+                .parentNode;
+
+            $warpedTimeIndicator.classList.add(...$originalSettingBtn.previousElementSibling.classList);
+
+            $originalSettingBtn.parentNode.insertBefore($warpedTimeIndicator, $originalSettingBtn);
+        };
+
+        placeStatusOverlay = ({ $overlay }) => {
+            this.$container.appendChild($overlay);
+        };
+    }
+
     class PlayRate {
         constructor({ impl, $media }) {
             this.impl = impl;
@@ -251,30 +274,35 @@
 
             {
                 // Set up status overlay
-                this.$overlayText = document.createElement("div");
-                Object.assign(this.$overlayText.style, {
-                    textAlign: "center",
-                    margin: "auto",
-                    fontSize: "11em",
-                    color: "rgba(255,255,255, 0.5)",
-                });
+                const $svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                $svg.setAttribute("viewBox", "0 0 324 200");
+                $svg.setAttribute("width", "100%");
+                $svg.setAttribute("height", "100%");
+                this.$overlayText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                this.$overlayText.setAttribute("x", "50%");
+                this.$overlayText.setAttribute("y", "50%");
+                this.$overlayText.setAttribute("text-anchor", "middle");
+                this.$overlayText.setAttribute("dominant-baseline", "middle");
+                this.$overlayText.setAttribute("fill", "rgba(255,255,255, 0.5)");
+                this.$overlayText.setAttribute("font-size", "48pt");
+                $svg.appendChild(this.$overlayText);
 
                 this.$overlay = document.createElement("div");
                 Object.assign(this.$overlay.style, {
                     backgroundColor: "rgba(0, 0, 0, 0.5)",
                     zIndex: 10,
-                    width: "50%",
-                    height: "50%",
+                    width: "40%",
+                    height: "40%",
                     position: "absolute",
                     display: "flex",
                     visibility: "hidden",
-                    top: "25%",
-                    left: "25%",
+                    top: "30%",
+                    left: "30%",
                     pointerEvents: "none",
                     transition: "all 0.5s linear",
                 });
 
-                this.$overlay.appendChild(this.$overlayText);
+                this.$overlay.appendChild($svg);
                 this.impl.placeStatusOverlay({ $overlay: this.$overlay });
             }
 
@@ -328,7 +356,7 @@
         };
 
         updateOverlayText = () => {
-            this.$overlayText.innerText = `${Math.round(this.$media.playbackRate * 100)}%`;
+            this.$overlayText.textContent = `${Math.round(this.$media.playbackRate * 100)}%`;
         };
 
         rateStepChange = (event) => {
@@ -422,13 +450,25 @@
                 }
                 instance = new PlayRate({ impl, $media });
             });
+        } else if (Utils.domainMatches("reddit.com")) {
+            Utils.awaitForMedia(($media) => {
+                if ($media.src.startsWith("https://")) {
+                    Utils.log("Video loaded in slider");
+                    return;
+                }
+                const $container = Utils.getAncestorNode($media, "[data-isvideoplayer='1']");
+                if (!$container) {
+                    Utils.log("Video not loaded in a container");
+                    return;
+                }
+                const impl = new RedditImpl($container);
+                if (instance) {
+                    instance.unload();
+                }
+                instance = new PlayRate({ impl, $media });
+            });
         }
     }
 
-    function onload() {
-        main();
-        document.removeEventListener("DOMContentLoaded", onload);
-    }
-
-    document.addEventListener("DOMContentLoaded", onload);
+    document.addEventListener("DOMContentLoaded", main, { once: true });
 })();

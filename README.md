@@ -13,6 +13,7 @@ Supported Websites
 * YouTube
 * Bilibili
 * Odysee
+* Reddit
 
 How to use
 ----------
