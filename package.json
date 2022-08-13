@@ -1,6 +1,6 @@
 {
   "name": "video_playrate_quick_control",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Easily control video playback speed",
   "repository": "https://github.com/Xinkai/VideoPlaybackRateQuickControl",
   "author": "Xinkai Chen <xinkai.chen@qq.com>",

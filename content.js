@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9.2
+// @version      1.9.3
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
 // @match        *://*.bilibili.com/*
 // @match        *://*.odysee.com/*
 // @match        *://*.reddit.com/*
+// @match        *://*.ixigua.com/*
 // @supportURL   https://github.com/Xinkai/VideoPlaybackRateQuickControl
 // @license      MIT
 // @run-at       document-start
@@ -105,6 +106,7 @@
     class SiteImpl {
         constructor($container) {
             this.$container = $container;
+            this.unloads = [];
         }
 
         /**
@@ -130,6 +132,7 @@
         constructor($container) {
             super($container);
             this.$container = $container;
+            this.unloads = [];
         }
 
         placeWarpedTimeIndicator = async ({
@@ -152,10 +155,12 @@
             $durationWarped.classList.add("ytp-time-duration");
 
             $toolbar.insertBefore($warpedTimeIndicator, $toolbar.firstChild);
+            this.unloads.push(() => $warpedTimeIndicator.remove());
         };
 
         placeStatusOverlay = ({ $overlay }) => {
             this.$container.appendChild($overlay);
+            this.unloads.push(() => $overlay.remove());
         };
     }
 
@@ -163,6 +168,7 @@
         constructor($container) {
             super($container);
             this.$container = $container;
+            this.unloads = [];
         }
 
         placeWarpedTimeIndicator = async ({
@@ -175,27 +181,44 @@
                     ".squirtle-speed-wrap",
                 ],
             );
+            let $elementToInsert = $warpedTimeIndicator;
             if ($originalPlayBackRate.matches(".bpx-player-ctrl-playbackrate")) {
-                $warpedTimeIndicator.classList.add("bpx-player-ctrl-btn");
+                $warpedTimeIndicator.classList.add("bpx-player-ctrl-time-label");
                 Object.assign($warpedTimeIndicator.style, {
-                    width: "auto",
-                    fontSize: "14px",
-                    fontWeight: 600,
+                    position: "inherit",
                 });
+                $currentWarped.classList.add("bpx-player-ctrl-time-current");
+                $separator.classList.add("bpx-player-ctrl-time-divide");
+                $durationWarped.classList.add("bpx-player-ctrl-time-duration");
+
+                const $wrapper = document.createElement("div");
+                $wrapper.classList.add("bpx-player-ctrl-btn", "bpx-player-ctrl-time");
+                $wrapper.append($warpedTimeIndicator);
+                Object.assign($wrapper.style, {
+                    width: "auto",
+                    marginRight: 0,
+                });
+                $elementToInsert = $wrapper;
             } else {
                 $warpedTimeIndicator.classList.add("squirtle-block-wrap");
+                $warpedTimeIndicator.style.setProperty("height", "auto", "important");
                 Object.assign($warpedTimeIndicator.style, {
-                    height: "auto",
                     fontSize: "14px",
                     fontWeight: 600,
                 });
             }
 
-            $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
+            $originalPlayBackRate.parentNode.insertBefore($elementToInsert, $originalPlayBackRate);
+            $originalPlayBackRate.style.display = "none";
+            this.unloads.push(() => {
+                $elementToInsert.remove();
+                $originalPlayBackRate.style.display = "block";
+            });
         };
 
         placeStatusOverlay = ({ $overlay }) => {
             this.$container.appendChild($overlay);
+            this.unloads.push(() => $overlay.remove());
         };
     }
 
@@ -203,6 +226,7 @@
         constructor($container) {
             super($container);
             this.$container = $container;
+            this.unloads = [];
         }
 
         placeWarpedTimeIndicator = async ({
@@ -216,10 +240,12 @@
             });
 
             $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
+            this.unloads.push(() => $warpedTimeIndicator.remove());
         };
 
         placeStatusOverlay = ({ $overlay }) => {
             this.$container.appendChild($overlay);
+            this.unloads.push(() => $overlay.remove());
         };
     }
 
@@ -227,6 +253,7 @@
         constructor($container) {
             super($container);
             this.$container = $container;
+            this.unloads = [];
         }
 
         placeWarpedTimeIndicator = async ({
@@ -238,10 +265,53 @@
             $warpedTimeIndicator.classList.add(...$originalSettingBtn.previousElementSibling.classList);
 
             $originalSettingBtn.parentNode.insertBefore($warpedTimeIndicator, $originalSettingBtn);
+            this.unloads.push(() => $warpedTimeIndicator.remove());
         };
 
         placeStatusOverlay = ({ $overlay }) => {
             this.$container.appendChild($overlay);
+            this.unloads.push(() => $overlay.remove());
+        };
+    }
+
+    class XiguaImpl extends SiteImpl {
+        constructor($container) {
+            super($container);
+            this.$container = $container;
+            this.unloads = [];
+        }
+
+        placeWarpedTimeIndicator = async ({
+            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {
+            $warpedTimeIndicator.classList.add("xgpcPlayer_textEntry");
+
+            const $entry = document.createElement("div");
+            $entry.classList.add("xgplayer-control-item__entry");
+            $entry.appendChild($warpedTimeIndicator);
+
+            const $item = document.createElement("div");
+            $item.classList.add("xgplayer-control-item", "control_playbackrate", "common-control-item");
+            $item.appendChild($entry);
+
+            const $itemContainer = document.createElement("div");
+            $itemContainer.classList.add("playerControlsItemContainer");
+            $itemContainer.appendChild($item);
+
+            const $originalPlaybackBtn = (await Utils.awaitForDescendant(this.$container, [".control_playbackrate"]))
+                .parentNode;
+
+            $originalPlaybackBtn.parentNode.insertBefore($itemContainer, $originalPlaybackBtn);
+            $originalPlaybackBtn.style.setProperty("display", "none");
+            this.unloads.push(() => {
+                $item.remove();
+                $originalPlaybackBtn.style.removeProperty("display");
+            });
+        };
+
+        placeStatusOverlay = ({ $overlay }) => {
+            this.$container.appendChild($overlay);
+            this.unloads.push(() => $overlay.remove());
         };
     }
 
@@ -320,14 +390,7 @@
         unload = () => {
             this.clearShowStatusOverlay();
             this.unloads.forEach((fn) => fn());
-            if (this.$overlay) {
-                this.$overlay.remove();
-                this.$overlay = null;
-            }
-            if (this.$warpedTimeIndicator) {
-                this.$warpedTimeIndicator.remove();
-                this.$warpedTimeIndicator = null;
-            }
+            this.impl.unloads.forEach((fn) => fn());
         };
 
         clearShowStatusOverlay = () => {
@@ -462,6 +525,19 @@
                     return;
                 }
                 const impl = new RedditImpl($container);
+                if (instance) {
+                    instance.unload();
+                }
+                instance = new PlayRate({ impl, $media });
+            });
+        } else if (Utils.domainMatches("ixigua.com")) {
+            Utils.awaitForMedia(($media) => {
+                const $container = Utils.getAncestorNode($media, "#player_default");
+                if (!$container) {
+                    Utils.log("Video not loaded in a container");
+                    return;
+                }
+                const impl = new XiguaImpl($container);
                 if (instance) {
                     instance.unload();
                 }

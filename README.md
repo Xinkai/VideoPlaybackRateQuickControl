@@ -14,6 +14,7 @@ Supported Websites
 * Bilibili
 * Odysee
 * Reddit
+* Xigua
 
 How to use
 ----------
