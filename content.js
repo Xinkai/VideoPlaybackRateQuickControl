@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9.3
+// @version      1.9.4
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
@@ -423,6 +423,9 @@
         };
 
         rateStepChange = (event) => {
+            if (event.deltaY === 0) {
+                return;
+            }
             if (this.changeRate(event.deltaY < 0 ? 0.1 : -0.1)) {
                 event.stopPropagation();
                 event.preventDefault();

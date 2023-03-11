@@ -3,7 +3,7 @@
 
   "name": "Video Playback Rate Quick Control",
   "description": "Easily control video playback speed",
-  "version": "1.9.3",
+  "version": "1.9.4",
 
   "content_scripts": [
     {
