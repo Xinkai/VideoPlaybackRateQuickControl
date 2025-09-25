@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9.4
+// @version      1.9.5
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
@@ -18,6 +18,8 @@
 /* eslint-disable max-classes-per-file */
 
 (() => {
+    const WHEEL_PIXEL_THRESHOLD = 100;
+
     class Utils {
         static getAncestorNode(node, selector) {
             let currentNode = node;
@@ -46,6 +48,14 @@
             accum += (+splits[len - 2]) * 60 || 0;
             accum += (+splits[len - 3]) * 60 || 0;
             return accum;
+        }
+
+        static floorToZero(x) {
+            if (x > 0) {
+                return Math.floor(x);
+            } else {
+                return Math.ceil(x);
+            }
         }
 
         static log(...args) {
@@ -320,6 +330,7 @@
             this.impl = impl;
             this.$media = $media;
             this.unloads = [];
+            this.pixelAccumulator = 0;
 
             {
                 // Set up warped time indicator
@@ -423,12 +434,28 @@
         };
 
         rateStepChange = (event) => {
-            if (event.deltaY === 0) {
-                return;
-            }
-            if (this.changeRate(event.deltaY < 0 ? 0.1 : -0.1)) {
-                event.stopPropagation();
-                event.preventDefault();
+            event.stopPropagation();
+            event.preventDefault();
+            switch (event.deltaMode) {
+                case WheelEvent.DOM_DELTA_PIXEL: {
+                    this.pixelAccumulator += event.deltaY;
+
+                    const rate = Utils.floorToZero(
+                        this.pixelAccumulator / WHEEL_PIXEL_THRESHOLD,
+                    );
+                    if (Math.abs(rate) > 0) {
+                        this.changeRate(rate * 0.1);
+                        this.pixelAccumulator %= WHEEL_PIXEL_THRESHOLD;
+                    }
+                    break;
+                }
+                case WheelEvent.DOM_DELTA_LINE: {
+                    this.changeRate(event.deltaY < 0 ? 0.1 : -0.1);
+                    break;
+                }
+                default: {
+                    throw new Error("Not supported");
+                }
             }
         };
 
