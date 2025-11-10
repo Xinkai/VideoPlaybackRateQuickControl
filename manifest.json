@@ -1,24 +1,24 @@
 {
-  "manifest_version": 3,
+    "manifest_version": 3,
 
-  "name": "Video Playback Rate Quick Control",
-  "description": "Easily control video playback speed",
-  "version": "1.9.5",
+    "name": "Video Playback Rate Quick Control",
+    "description": "Easily control video playback speed",
+    "version": "1.9.6",
 
-  "content_scripts": [
-    {
-      "matches"   : ["<all_urls>"],
-      "js"        : ["content.js"],
-      "run_at"    : "document_start",
-      "all_frames": true
-    }
-  ],
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"],
+            "run_at": "document_start",
+            "all_frames": true
+        }
+    ],
 
-  "host_permissions": [
-    "*://*.youtube.com/*",
-    "*://*.bilibili.com/*",
-    "*://*.odysee.com/*",
-    "*://*.reddit.com/*",
-    "*://*.ixigua.com/*"
-  ]
+    "host_permissions": [
+        "*://*.youtube.com/*",
+        "*://*.bilibili.com/*",
+        "*://*.odysee.com/*",
+        "*://*.reddit.com/*",
+        "*://*.ixigua.com/*"
+    ]
 }

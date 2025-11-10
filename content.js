@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Playback Rate Quick Control
 // @namespace    https://github.com/Xinkai
-// @version      1.9.5
+// @version      1.9.6
 // @description  Easily control video playback speed
 // @author       Xinkai Chen <xinkai.chen@qq.com>
 // @match        *://*.youtube.com/*
@@ -35,8 +35,8 @@
         static formatTime(seconds) {
             const h = (seconds / 3600) | 0; // eslint-disable-line no-bitwise
             const m = (seconds / 60) % 60 | 0; // eslint-disable-line no-bitwise
-            const s = (seconds % 60) | 0; // eslint-disable-line no-bitwise
-            const mStr = (h > 0 && m < 10) ? `0${m}` : `${m}`;
+            const s = seconds % 60 | 0; // eslint-disable-line no-bitwise
+            const mStr = h > 0 && m < 10 ? `0${m}` : `${m}`;
             const sStr = s < 10 ? `0${s}` : `${s}`;
             return h !== 0 ? `${h}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
         }
@@ -45,8 +45,8 @@
             const splits = str.split(":");
             const len = splits.length;
             let accum = +splits[len - 1];
-            accum += (+splits[len - 2]) * 60 || 0;
-            accum += (+splits[len - 3]) * 60 || 0;
+            accum += +splits[len - 2] * 60 || 0;
+            accum += +splits[len - 3] * 60 || 0;
             return accum;
         }
 
@@ -75,9 +75,17 @@
                     callback(event.target);
                 }
             };
-            document.body.addEventListener("loadedmetadata", onMetaDataLoaded, true);
+            document.body.addEventListener(
+                "loadedmetadata",
+                onMetaDataLoaded,
+                true,
+            );
             return () => {
-                document.body.removeEventListener("loadedmetadata", onMetaDataLoaded, true);
+                document.body.removeEventListener(
+                    "loadedmetadata",
+                    onMetaDataLoaded,
+                    true,
+                );
             };
         };
 
@@ -96,7 +104,11 @@
                         }
                         for (const addedNode of mutation.addedNodes) {
                             if (addedNode instanceof HTMLElement) {
-                                if (selectors.some((selector) => addedNode.matches(selector))) {
+                                if (
+                                    selectors.some((selector) =>
+                                        addedNode.matches(selector),
+                                    )
+                                ) {
                                     observer.disconnect();
                                     resolve(addedNode);
                                 }
@@ -109,7 +121,10 @@
         };
 
         static domainMatches(host) {
-            return window.location.host === host || window.location.host.endsWith(`.${host}`);
+            return (
+                window.location.host === host ||
+                window.location.host.endsWith(`.${host}`)
+            );
         }
     }
 
@@ -124,17 +139,18 @@
          */
         // eslint-disable-next-line class-methods-use-this
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
-        }) => {
-
-        };
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped, // eslint-disable-line no-unused-vars
+        }) => {};
 
         /**
          * @abstract
          */
         // eslint-disable-next-line class-methods-use-this
-        placeStatusOverlay = ({ $overlay }) => { // eslint-disable-line no-unused-vars
-
+        placeStatusOverlay = ({ $overlay }) => {
+            // eslint-disable-line no-unused-vars
         };
     }
 
@@ -146,26 +162,29 @@
         }
 
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped,
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped,
         }) => {
-            const $toolbar = this.$container.querySelector(".ytp-right-controls");
+            const $toolbar = this.$container.querySelector(
+                ".ytp-right-controls",
+            );
 
-            // fix style: floating .ytp-right-controls may overflow
-            $toolbar.parentNode.style.position = "relative";
-            Object.assign($toolbar.style, {
-                position: "absolute",
-                right: 0,
-                top: 0,
-                float: "none",
-            });
+            const $contents = document.createElement("div");
+            $contents.classList.add("ytp-time-display", "notranslate");
+            $contents.style.paddingTop = "0";
+            $contents.style.paddingBottom = "0";
 
-            $warpedTimeIndicator.classList.add("ytp-time-display", "playrate-ext", "notranslate");
+            $warpedTimeIndicator.classList.add("ytp-time-contents");
             $currentWarped.classList.add("ytp-time-current");
             $separator.classList.add("ytp-time-separator");
             $durationWarped.classList.add("ytp-time-duration");
 
-            $toolbar.insertBefore($warpedTimeIndicator, $toolbar.firstChild);
-            this.unloads.push(() => $warpedTimeIndicator.remove());
+            $contents.appendChild($warpedTimeIndicator);
+
+            $toolbar.insertBefore($contents, $toolbar.firstChild);
+            this.unloads.push(() => $contents.remove());
         };
 
         placeStatusOverlay = ({ $overlay }) => {
@@ -182,18 +201,22 @@
         }
 
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped, // eslint-disable-line no-unused-vars
         }) => {
             const $originalPlayBackRate = await Utils.awaitForDescendant(
                 this.$container,
-                [
-                    ".bpx-player-ctrl-playbackrate",
-                    ".squirtle-speed-wrap",
-                ],
+                [".bpx-player-ctrl-playbackrate", ".squirtle-speed-wrap"],
             );
             let $elementToInsert = $warpedTimeIndicator;
-            if ($originalPlayBackRate.matches(".bpx-player-ctrl-playbackrate")) {
-                $warpedTimeIndicator.classList.add("bpx-player-ctrl-time-label");
+            if (
+                $originalPlayBackRate.matches(".bpx-player-ctrl-playbackrate")
+            ) {
+                $warpedTimeIndicator.classList.add(
+                    "bpx-player-ctrl-time-label",
+                );
                 Object.assign($warpedTimeIndicator.style, {
                     position: "inherit",
                 });
@@ -202,7 +225,10 @@
                 $durationWarped.classList.add("bpx-player-ctrl-time-duration");
 
                 const $wrapper = document.createElement("div");
-                $wrapper.classList.add("bpx-player-ctrl-btn", "bpx-player-ctrl-time");
+                $wrapper.classList.add(
+                    "bpx-player-ctrl-btn",
+                    "bpx-player-ctrl-time",
+                );
                 $wrapper.append($warpedTimeIndicator);
                 Object.assign($wrapper.style, {
                     width: "auto",
@@ -211,14 +237,21 @@
                 $elementToInsert = $wrapper;
             } else {
                 $warpedTimeIndicator.classList.add("squirtle-block-wrap");
-                $warpedTimeIndicator.style.setProperty("height", "auto", "important");
+                $warpedTimeIndicator.style.setProperty(
+                    "height",
+                    "auto",
+                    "important",
+                );
                 Object.assign($warpedTimeIndicator.style, {
                     fontSize: "14px",
                     fontWeight: 600,
                 });
             }
 
-            $originalPlayBackRate.parentNode.insertBefore($elementToInsert, $originalPlayBackRate);
+            $originalPlayBackRate.parentNode.insertBefore(
+                $elementToInsert,
+                $originalPlayBackRate,
+            );
             $originalPlayBackRate.style.display = "none";
             this.unloads.push(() => {
                 $elementToInsert.remove();
@@ -240,16 +273,29 @@
         }
 
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped, // eslint-disable-line no-unused-vars
         }) => {
-            const $originalPlayBackRate = await Utils.awaitForDescendant(this.$container, [".vjs-playback-rate"]);
+            const $originalPlayBackRate = await Utils.awaitForDescendant(
+                this.$container,
+                [".vjs-playback-rate"],
+            );
 
-            $warpedTimeIndicator.classList.add("vjs-menu-button", "vjs-playback-rate", "vjs-control");
+            $warpedTimeIndicator.classList.add(
+                "vjs-menu-button",
+                "vjs-playback-rate",
+                "vjs-control",
+            );
             Object.assign($warpedTimeIndicator.style, {
                 width: "auto",
             });
 
-            $originalPlayBackRate.parentNode.insertBefore($warpedTimeIndicator, $originalPlayBackRate);
+            $originalPlayBackRate.parentNode.insertBefore(
+                $warpedTimeIndicator,
+                $originalPlayBackRate,
+            );
             this.unloads.push(() => $warpedTimeIndicator.remove());
         };
 
@@ -267,14 +313,25 @@
         }
 
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped, // eslint-disable-line no-unused-vars
         }) => {
-            const $originalSettingBtn = (await Utils.awaitForDescendant(this.$container, ["[aria-label='Settings']"]))
-                .parentNode;
+            const $originalSettingBtn = (
+                await Utils.awaitForDescendant(this.$container, [
+                    "[aria-label='Settings']",
+                ])
+            ).parentNode;
 
-            $warpedTimeIndicator.classList.add(...$originalSettingBtn.previousElementSibling.classList);
+            $warpedTimeIndicator.classList.add(
+                ...$originalSettingBtn.previousElementSibling.classList,
+            );
 
-            $originalSettingBtn.parentNode.insertBefore($warpedTimeIndicator, $originalSettingBtn);
+            $originalSettingBtn.parentNode.insertBefore(
+                $warpedTimeIndicator,
+                $originalSettingBtn,
+            );
             this.unloads.push(() => $warpedTimeIndicator.remove());
         };
 
@@ -292,7 +349,10 @@
         }
 
         placeWarpedTimeIndicator = async ({
-            $warpedTimeIndicator, $currentWarped, $separator, $durationWarped, // eslint-disable-line no-unused-vars
+            $warpedTimeIndicator,
+            $currentWarped,
+            $separator,
+            $durationWarped, // eslint-disable-line no-unused-vars
         }) => {
             $warpedTimeIndicator.classList.add("xgpcPlayer_textEntry");
 
@@ -301,17 +361,27 @@
             $entry.appendChild($warpedTimeIndicator);
 
             const $item = document.createElement("div");
-            $item.classList.add("xgplayer-control-item", "control_playbackrate", "common-control-item");
+            $item.classList.add(
+                "xgplayer-control-item",
+                "control_playbackrate",
+                "common-control-item",
+            );
             $item.appendChild($entry);
 
             const $itemContainer = document.createElement("div");
             $itemContainer.classList.add("playerControlsItemContainer");
             $itemContainer.appendChild($item);
 
-            const $originalPlaybackBtn = (await Utils.awaitForDescendant(this.$container, [".control_playbackrate"]))
-                .parentNode;
+            const $originalPlaybackBtn = (
+                await Utils.awaitForDescendant(this.$container, [
+                    ".control_playbackrate",
+                ])
+            ).parentNode;
 
-            $originalPlaybackBtn.parentNode.insertBefore($itemContainer, $originalPlaybackBtn);
+            $originalPlaybackBtn.parentNode.insertBefore(
+                $itemContainer,
+                $originalPlaybackBtn,
+            );
             $originalPlaybackBtn.style.setProperty("display", "none");
             this.unloads.push(() => {
                 $item.remove();
@@ -355,16 +425,25 @@
 
             {
                 // Set up status overlay
-                const $svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                const $svg = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "svg",
+                );
                 $svg.setAttribute("viewBox", "0 0 324 200");
                 $svg.setAttribute("width", "100%");
                 $svg.setAttribute("height", "100%");
-                this.$overlayText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                this.$overlayText = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "text",
+                );
                 this.$overlayText.setAttribute("x", "50%");
                 this.$overlayText.setAttribute("y", "50%");
                 this.$overlayText.setAttribute("text-anchor", "middle");
                 this.$overlayText.setAttribute("dominant-baseline", "middle");
-                this.$overlayText.setAttribute("fill", "rgba(255,255,255, 0.5)");
+                this.$overlayText.setAttribute(
+                    "fill",
+                    "rgba(255,255,255, 0.5)",
+                );
                 this.$overlayText.setAttribute("font-size", "48pt");
                 $svg.appendChild(this.$overlayText);
 
@@ -395,7 +474,9 @@
 
         addNodeEventListener = (node, eventName, handler) => {
             node.addEventListener(eventName, handler);
-            this.unloads.push(() => node.removeEventListener(eventName, handler));
+            this.unloads.push(() =>
+                node.removeEventListener(eventName, handler),
+            );
         };
 
         unload = () => {
@@ -422,11 +503,15 @@
         };
 
         updateCurrent = () => {
-            this.$currentWarped.innerText = Utils.formatTime(this.$media.currentTime / this.rate);
+            this.$currentWarped.innerText = Utils.formatTime(
+                this.$media.currentTime / this.rate,
+            );
         };
 
         updateDuration = () => {
-            this.$durationWarped.innerText = Utils.formatTime(this.$media.duration / this.rate);
+            this.$durationWarped.innerText = Utils.formatTime(
+                this.$media.duration / this.rate,
+            );
         };
 
         updateOverlayText = () => {
@@ -460,11 +545,17 @@
         };
 
         setupUserInputListeners = () => {
-            this.addNodeEventListener(this.$warpedTimeIndicator, "wheel", this.rateStepChange);
+            this.addNodeEventListener(
+                this.$warpedTimeIndicator,
+                "wheel",
+                this.rateStepChange,
+            );
 
             this.addNodeEventListener(document, "keydown", (event) => {
-                if (event.target.tagName !== "INPUT"
-                    && event.target.contentEditable === "inherit") {
+                if (
+                    event.target.tagName !== "INPUT" &&
+                    event.target.contentEditable === "inherit"
+                ) {
                     const step = {
                         NumpadAdd: 0.1,
                         NumpadSubtract: -0.1,
@@ -476,16 +567,34 @@
                 }
             });
 
-            this.addNodeEventListener(this.$media, "durationchange", this.updateDuration);
-            this.addNodeEventListener(this.$media, "ratechange", this.onRateReset);
-            this.addNodeEventListener(this.$media, "loadedmetadata", this.onRateReset);
-            this.addNodeEventListener(this.$media, "timeupdate", this.updateCurrent);
+            this.addNodeEventListener(
+                this.$media,
+                "durationchange",
+                this.updateDuration,
+            );
+            this.addNodeEventListener(
+                this.$media,
+                "ratechange",
+                this.onRateReset,
+            );
+            this.addNodeEventListener(
+                this.$media,
+                "loadedmetadata",
+                this.onRateReset,
+            );
+            this.addNodeEventListener(
+                this.$media,
+                "timeupdate",
+                this.updateCurrent,
+            );
         };
 
         changeRate = (step) => {
             const { playbackRate } = this.$media;
-            if ((step > 0 && playbackRate < 4)
-                || (step < 0 && playbackRate > 0.2)) {
+            if (
+                (step > 0 && playbackRate < 4) ||
+                (step < 0 && playbackRate > 0.2)
+            ) {
                 const newRate = playbackRate + step;
                 this.$media.playbackRate = Math.round(newRate * 100) / 100;
                 return true;
@@ -506,7 +615,10 @@
         let instance = null;
         if (Utils.domainMatches("youtube.com")) {
             Utils.awaitForMedia(($media) => {
-                const $container = Utils.getAncestorNode($media, ".html5-video-player");
+                const $container = Utils.getAncestorNode(
+                    $media,
+                    ".html5-video-player",
+                );
                 if (!$container) {
                     Utils.log("Video not loaded in a container");
                     return;
@@ -519,7 +631,10 @@
             });
         } else if (Utils.domainMatches("bilibili.com")) {
             Utils.awaitForMedia(($media) => {
-                const $container = Utils.getAncestorNode($media, "#bilibili-player .bpx-player-container");
+                const $container = Utils.getAncestorNode(
+                    $media,
+                    "#bilibili-player .bpx-player-container",
+                );
                 if (!$container) {
                     Utils.log("Video not loaded in a container");
                     return;
@@ -549,7 +664,10 @@
                     Utils.log("Video loaded in slider");
                     return;
                 }
-                const $container = Utils.getAncestorNode($media, "[data-isvideoplayer='1']");
+                const $container = Utils.getAncestorNode(
+                    $media,
+                    "[data-isvideoplayer='1']",
+                );
                 if (!$container) {
                     Utils.log("Video not loaded in a container");
                     return;
@@ -562,7 +680,10 @@
             });
         } else if (Utils.domainMatches("ixigua.com")) {
             Utils.awaitForMedia(($media) => {
-                const $container = Utils.getAncestorNode($media, "#player_default");
+                const $container = Utils.getAncestorNode(
+                    $media,
+                    "#player_default",
+                );
                 if (!$container) {
                     Utils.log("Video not loaded in a container");
                     return;
